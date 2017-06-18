@@ -1,0 +1,60 @@
+""" Blotto game - two-person zero-sum game in which the players are tasked to simultaneously distribute limited resources over several objects (or battlefields); 
+the player devoting the most resources to a battlefield wins that battlefield, and the gain (or payoff) is then equal to the total number of battlefields won
+For S = 6 only three choices of numbers are possible: (2, 2, 2), (1, 2, 3) and (1, 1, 4). It is easy to see that:
+Any triplet against itself is a draw
+    (1, 1, 4) against (1, 2, 3) is a draw
+    (1, 2, 3) against (2, 2, 2) is a draw
+    (2, 2, 2) beats (1, 1, 4) """
+
+
+#Określamy M - macierz wypłat gry Colonel-Blotto
+
+M = matrix([[0, 0, 1], [0, 0, 0], [-1, 0, 0]])
+
+show(M)
+
+
+
+#Colonel-Blotto jako program liniowy:
+
+import numpy as np
+
+M = np.array([[0, 0, 1], [0, 0, 0], [-1, 0, 0]])
+
+#nowe wiersze i kolumny
+
+insert_row = np.append([[1]*M.shape[0]], [[0]], axis=1)
+insert_column = [[-1]]*M.shape[1]
+
+#ograniczenia
+
+constr = [">="]*M.shape[1]
+constr.append("==")
+
+#zmienne
+
+variable = [">="]*M.shape[0]
+variable.append("")
+
+# wyznaczanie wektorów b, c i macierzy A
+
+b = [0]*M.shape[1]
+b.append(1)
+
+c = [0]*M.shape[0]
+c.append(1)
+
+A = M.transpose()
+A = np.append(A, insert_column, axis=1)
+A = np.append(A, insert_row, axis=0)
+
+
+
+P = InteractiveLPProblem(A, b, c, constraint_type = constr, variable_type = variable)
+
+Q=P.standard_form().run_simplex_method()
+
+
+
+show(P)
+show(Q)
