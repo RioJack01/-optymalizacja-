@@ -1,0 +1,58 @@
+#generujemy macierz połączeń w grafie, gdzie i-ty wiersz oznacza możliwe krawędzie łączące i-ty wierzchołek z wiersza górnego z kolejnymi punktami wiersza dolnego.
+graf =[[1,0,1,0,0,1,0],[1,0,0,1,0,0,0],[0,1,1,0,1,0,0],[1,0,0,1,0,0,1],[0,1,0,0,0,0,1],[0,1,0,0,1,1,0],[0,0,1,0,0,0,1]]
+#graf =[[1,0,1,0,0,1,0,1],[1,0,0,1,0,0,0,1],[0,1,1,0,1,0,0,1],[1,0,0,1,0,0,1,1],[0,1,0,0,0,0,1,1],[0,1,0,0,1,1,0,1],[0,0,1,0,0,0,1,1],[1,1,1,1,1,1,1,1]]
+LP = MixedIntegerLinearProgram(maximization=True)
+x = LP.new_variable(integer=True, nonnegative=True)
+
+# konstrukcja problemu liniowego
+dlugosc = len(graf)
+
+for i in range(dlugosc):
+    ograniczenia = 0
+    for j in range(dlugosc):
+        if graf[i][j] == 1:
+            ograniczenia += x[i, j]
+    LP.add_constraint(ograniczenia, max = 1)
+
+for j in range(dlugosc):
+    ograniczenia = 0
+    for j in range(dlugosc):
+        if graf[j][i] == 1:
+            ograniczenia += x[j, i]
+    LP.add_constraint(ograniczenia, max = 1)
+    
+cel = 0
+for i in range(dlugosc):
+    for j in range(dlugosc):
+        if graf[i][j] == 1:
+            cel += x[i, j]
+LP.set_objective(cel)
+
+print "Problem bazowy \n"
+LP.show()
+print LP.solve()
+print LP.get_values(x)
+
+#konstrukcja problemu dualnego do zadanego
+
+LP = MixedIntegerLinearProgram(maximization=False)
+x = LP.new_variable(integer=True, nonnegative=True)
+
+for i in range(dlugosc):
+    for j in range(dlugosc):
+        if graf[i][j] == 1:
+            LP.add_constraint(x[0, i] + x[1, j], min = 1)
+            
+cel = 0
+for i in range(2):
+    for j in range(dlugosc):
+        cel += x[i, j]
+LP.set_objective(cel)
+
+print'\n'
+print 'Problem dualny \n'
+
+LP.show()
+print LP.solve()
+print LP.get_values(x)
+
