@@ -1,0 +1,50 @@
+%typeset_mode True
+import numpy as np
+import itertools
+def NaiveSolve():
+    n = int(raw_input("Proszę podać liczbę zmiennych :"))
+    m = int(raw_input("Proszę podać liczbę ograniczeń:"))
+    A = np.zeros((m, n))
+    b = []
+    c = []
+    for row in range(m):
+        for column in range(n):
+            A[row, column] = int(raw_input("Prosze podać %u wspolczynnik %u-go ograniczenia" %(column + 1, row + 1)))
+    for i in range(m):
+        b.append(int(raw_input("Proszę podać współczynnik stojący po prawej stronie równania %u" % (i + 1))))
+    for i in range(n):
+        c.append(int(raw_input("Proszę podać %u współczynnik funkcji celu" % (i + 1))))
+    P = InteractiveLPProblem(A, b, c, variable_type = "")
+    P = P.standard_form()
+    view(P)
+    optimal_value = float('-inf')
+    val = P.Abcx()
+    tmp = []
+    tmp.append(np.hstack((np.array(val[0]), np.identity(m))))
+    tmp.append(val[1])
+    tmp.append(np.append(np.array(val[2]), np.zeros(m)))
+    for apex in itertools.combinations(range(len(tmp[0][0])), m):
+        A_cut = tmp[0][:, apex]
+        b_cut = tmp[1]
+        c_cut = []
+        for a in apex:
+            c_cut.append(tmp[2][a])
+        if np.linalg.det(A_cut) != 0.0:
+            values = np.linalg.solve(A_cut, b_cut)
+            check = True
+            for i in range(len(values)):
+                if values[i] < 0:
+                    check = False
+            if check:
+                solution = 0
+                for i in range(len(values)):
+                    solution += c_cut[i] * values[i]
+                if solution > optimal_value:
+                    optimal_value = solution
+    if optimal_value != float('-inf'):
+        print("MAMY OPTYMALNE ROZWIAZANIE I WYNOSI ONO %s" % (optimal_value))
+        return
+    else:
+        print("NIE MA OPTYMALNEGO ROZWIAZANIA!")
+        return
+NaiveSolve()
