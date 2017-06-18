@@ -1,0 +1,1206 @@
+import random
+import numpy as np
+from copy import deepcopy as dc
+
+#
+# Definicje problemów
+#
+
+
+LP0=\
+"""
+Minimize
+obj: 2 x1 + 1.5 x2 + 5 x3 
+
+Subject To
+witA: 35 x1 + 0.5 x2 + 0.5 x3 >= 0.5
+witB: 60 x1 + 300 x2 + 10 x3 >= 15
+blonnik: 30 x1 + 20 x2 + 10 x3 >= 4 
+
+Bounds
+x1 >= 0
+x2 >= 0
+x3 >= 0
+
+Generals
+x1
+x2
+x3
+
+End
+"""
+
+LP1 = \
+"""
+Minimize
+Sum_of_Transporting_Costs: 2 Route_A_1 + 4 Route_A_2 + 5 Route_A_3
+ + 2 Route_A_4 + Route_A_5 + 3 Route_B_1 + Route_B_2 + 3 Route_B_3
+ + 2 Route_B_4 + 3 Route_B_5
+Subject To
+Sum_of_Products_into_Bar1: Route_A_1 + Route_B_1 >= 500
+Sum_of_Products_into_Bar2: Route_A_2 + Route_B_2 >= 900
+Sum_of_Products_into_Bar3: Route_A_3 + Route_B_3 >= 1800
+Sum_of_Products_into_Bar4: Route_A_4 + Route_B_4 >= 200
+Sum_of_Products_into_Bar5: Route_A_5 + Route_B_5 >= 700
+Sum_of_Products_out_of_Warehouse_A: Route_A_1 + Route_A_2 + Route_A_3
+ + Route_A_4 + Route_A_5 <= 1000
+Sum_of_Products_out_of_Warehouse_B: Route_B_1 + Route_B_2 + Route_B_3
+ + Route_B_4 + Route_B_5 <= 4000
+Route_A_1 >= 0
+Route_A_2 >= 0
+Route_A_3 >= 0
+Route_A_4 >= 0
+Route_A_5 >= 0
+Route_B_1 >= 0
+Route_B_2 >= 0
+Route_B_3 >= 0
+Route_B_4 >= 0
+Route_B_5 >= 0
+Generals
+Route_A_1
+Route_A_2
+Route_A_3
+Route_A_4
+Route_A_5
+Route_B_1
+Route_B_2
+Route_B_3
+Route_B_4
+Route_B_5
+End
+"""
+LP2 = \
+"""
+Minimize
+Total_Cost_of_Transport: 0.12 Route_('Chicago',_'Gary')
+ + 0.6 Route_('Chicago',_'Tempe') + 0.35 Route_('Cincinatti',_'Albany')
+ + 0.55 Route_('Cincinatti',_'Houston')
+ + 0.375 Route_('Kansas_City',_'Houston')
+ + 0.65 Route_('Kansas_City',_'Tempe') + 0.4 Route_('Pittsburgh',_'Chicago')
+ + 0.35 Route_('Pittsburgh',_'Cincinatti') + 0.45 Route_('Pittsburgh',_'Gary')
+ + 0.45 Route_('Pittsburgh',_'Kansas_City')
+ + 0.5 Route_('Youngstown',_'Albany') + 0.375 Route_('Youngstown',_'Chicago')
+ + 0.35 Route_('Youngstown',_'Cincinatti')
+ + 0.45 Route_('Youngstown',_'Kansas_City')
+Subject To
+Steel_Flow_Conservation_in_Node_Albany: Route_('Cincinatti',_'Albany')
+ + Route_('Youngstown',_'Albany') >= 3000
+Steel_Flow_Conservation_in_Node_Chicago: - Route_('Chicago',_'Gary')
+ - Route_('Chicago',_'Tempe') + Route_('Pittsburgh',_'Chicago')
+ + Route_('Youngstown',_'Chicago') >= 0
+Steel_Flow_Conservation_in_Node_Cincinatti: - Route_('Cincinatti',_'Albany')
+ - Route_('Cincinatti',_'Houston') + Route_('Pittsburgh',_'Cincinatti')
+ + Route_('Youngstown',_'Cincinatti') >= 0
+Steel_Flow_Conservation_in_Node_Gary: Route_('Chicago',_'Gary')
+ + Route_('Pittsburgh',_'Gary') >= 6000
+Steel_Flow_Conservation_in_Node_Houston: Route_('Cincinatti',_'Houston')
+ + Route_('Kansas_City',_'Houston') >= 7000
+Steel_Flow_Conservation_in_Node_Kansas_City:
+ - Route_('Kansas_City',_'Houston') - Route_('Kansas_City',_'Tempe')
+ + Route_('Pittsburgh',_'Kansas_City') + Route_('Youngstown',_'Kansas_City')
+ >= 0
+Steel_Flow_Conservation_in_Node_Pittsburgh: - Route_('Pittsburgh',_'Chicago')
+ - Route_('Pittsburgh',_'Cincinatti') - Route_('Pittsburgh',_'Gary')
+ - Route_('Pittsburgh',_'Kansas_City') >= -15000
+Steel_Flow_Conservation_in_Node_Tempe: Route_('Chicago',_'Tempe')
+ + Route_('Kansas_City',_'Tempe') >= 4000
+Steel_Flow_Conservation_in_Node_Youngstown: - Route_('Youngstown',_'Albany')
+ - Route_('Youngstown',_'Chicago') - Route_('Youngstown',_'Cincinatti')
+ - Route_('Youngstown',_'Kansas_City') >= -10000
+
+Route_('Chicago',_'Gary') <= 4000
+Route_('Chicago',_'Tempe') <= 2000
+Route_('Cincinatti',_'Albany') <= 5000
+Route_('Cincinatti',_'Houston') <= 6000
+Route_('Kansas_City',_'Houston') <= 4000
+Route_('Kansas_City',_'Tempe') <= 4000
+Route_('Pittsburgh',_'Chicago') <= 4000
+Route_('Pittsburgh',_'Cincinatti') <= 2000
+Route_('Pittsburgh',_'Gary') <= 2000
+Route_('Pittsburgh',_'Kansas_City') <= 3000
+Route_('Youngstown',_'Albany') <= 1000
+Route_('Youngstown',_'Chicago') <= 5000
+Route_('Youngstown',_'Cincinatti') <= 3000
+Route_('Youngstown',_'Kansas_City') <= 5000
+
+Route_('Chicago',_'Gary') >= 0
+Route_('Chicago',_'Tempe') >= 0
+Route_('Cincinatti',_'Albany') >= 1000
+Route_('Cincinatti',_'Houston') >= 0
+Route_('Kansas_City',_'Houston') >= 0
+Route_('Kansas_City',_'Tempe') >= 0
+Route_('Pittsburgh',_'Chicago') >= 0
+Route_('Pittsburgh',_'Cincinatti') >= 0
+Route_('Pittsburgh',_'Gary') >= 0
+Route_('Pittsburgh',_'Kansas_City') >= 2000
+Route_('Youngstown',_'Albany') >= 0
+Route_('Youngstown',_'Chicago') >= 0
+Route_('Youngstown',_'Cincinatti') >= 0
+Route_('Youngstown',_'Kansas_City') >= 1000
+Generals
+Route_('Chicago',_'Gary')
+Route_('Chicago',_'Tempe')
+Route_('Cincinatti',_'Albany')
+Route_('Cincinatti',_'Houston')
+Route_('Kansas_City',_'Houston')
+Route_('Kansas_City',_'Tempe')
+Route_('Pittsburgh',_'Chicago')
+Route_('Pittsburgh',_'Cincinatti')
+Route_('Pittsburgh',_'Gary')
+Route_('Pittsburgh',_'Kansas_City')
+Route_('Youngstown',_'Albany')
+Route_('Youngstown',_'Chicago')
+Route_('Youngstown',_'Cincinatti')
+Route_('Youngstown',_'Kansas_City')
+End
+"""
+
+LP3 =\
+"""
+Minimize
+Total_Costs: 70000 BuildaPlant_Denver + 70000 BuildaPlant_Los_Angeles
+ + 65000 BuildaPlant_Phoenix + 70000 BuildaPlant_San_Francisco
+ + 8 Route_Denver_Barstow + 5 Route_Denver_Dallas + 9 Route_Denver_San_Diego
+ + 6 Route_Denver_Tucson + 7 Route_Los_Angeles_Barstow
+ + 10 Route_Los_Angeles_Dallas + 4 Route_Los_Angeles_San_Diego
+ + 8 Route_Los_Angeles_Tucson + 5 Route_Phoenix_Barstow
+ + 8 Route_Phoenix_Dallas + 6 Route_Phoenix_San_Diego + 3 Route_Phoenix_Tucson
+ + 3 Route_San_Francisco_Barstow + 6 Route_San_Francisco_Dallas
+ + 5 Route_San_Francisco_San_Diego + 2 Route_San_Francisco_Tucson
+Subject To
+Sum_of_Products_into_Stores_Barstow: Route_Denver_Barstow
+ + Route_Los_Angeles_Barstow + Route_Phoenix_Barstow
+ + Route_San_Francisco_Barstow >= 1000
+Sum_of_Products_into_Stores_Dallas: Route_Denver_Dallas
+ + Route_Los_Angeles_Dallas + Route_Phoenix_Dallas
+ + Route_San_Francisco_Dallas >= 1200
+Sum_of_Products_into_Stores_San_Diego: Route_Denver_San_Diego
+ + Route_Los_Angeles_San_Diego + Route_Phoenix_San_Diego
+ + Route_San_Francisco_San_Diego >= 1700
+Sum_of_Products_into_Stores_Tucson: Route_Denver_Tucson
+ + Route_Los_Angeles_Tucson + Route_Phoenix_Tucson
+ + Route_San_Francisco_Tucson >= 1500
+Sum_of_Products_out_of_Plant_Denver: - 2000 BuildaPlant_Denver
+ + Route_Denver_Barstow + Route_Denver_Dallas + Route_Denver_San_Diego
+ + Route_Denver_Tucson <= 0
+Sum_of_Products_out_of_Plant_Los_Angeles: - 2000 BuildaPlant_Los_Angeles
+ + Route_Los_Angeles_Barstow + Route_Los_Angeles_Dallas
+ + Route_Los_Angeles_San_Diego + Route_Los_Angeles_Tucson <= 0
+Sum_of_Products_out_of_Plant_Phoenix: - 1700 BuildaPlant_Phoenix
+ + Route_Phoenix_Barstow + Route_Phoenix_Dallas + Route_Phoenix_San_Diego
+ + Route_Phoenix_Tucson <= 0
+Sum_of_Products_out_of_Plant_San_Francisco: - 1700 BuildaPlant_San_Francisco
+ + Route_San_Francisco_Barstow + Route_San_Francisco_Dallas
+ + Route_San_Francisco_San_Diego + Route_San_Francisco_Tucson <= 0
+
+Route_Denver_Barstow >= 0
+Route_Denver_Dallas >= 0
+Route_Denver_San_Diego >= 0
+Route_Denver_Tucson >= 0
+Route_Los_Angeles_Barstow >= 0
+Route_Los_Angeles_Dallas >= 0
+Route_Los_Angeles_San_Diego >= 0
+Route_Los_Angeles_Tucson >= 0
+Route_Phoenix_Barstow >= 0
+Route_Phoenix_Dallas >= 0
+Route_Phoenix_San_Diego >= 0
+Route_Phoenix_Tucson >= 0
+Route_San_Francisco_Barstow >= 0
+Route_San_Francisco_Dallas >= 0
+Route_San_Francisco_San_Diego >= 0
+Route_San_Francisco_Tucson >= 0
+Generals
+Route_Denver_Barstow
+Route_Denver_Dallas
+Route_Denver_San_Diego
+Route_Denver_Tucson
+Route_Los_Angeles_Barstow
+Route_Los_Angeles_Dallas
+Route_Los_Angeles_San_Diego
+Route_Los_Angeles_Tucson
+Route_Phoenix_Barstow
+Route_Phoenix_Dallas
+Route_Phoenix_San_Diego
+Route_Phoenix_Tucson
+Route_San_Francisco_Barstow
+Route_San_Francisco_Dallas
+Route_San_Francisco_San_Diego
+Route_San_Francisco_Tucson
+Binaries
+BuildaPlant_Denver
+BuildaPlant_Los_Angeles
+BuildaPlant_Phoenix
+BuildaPlant_San_Francisco
+End
+"""
+
+LP4=\
+"""
+Maximize
+OBJ: 100 Number_of_Chairs_A + 150 Number_of_Chairs_B
+Subject To
+capacity_of_Lathe: Number_of_Chairs_A + 2 Number_of_Chairs_B <= 40
+capacity_of_Polisher: 3 Number_of_Chairs_A + 1.5 Number_of_Chairs_B <= 48
+End
+"""
+
+LP5=\
+"""
+Maximize 
+ x1.1 + x1.2 + x1.3 + x1.4 + x2.1 + x2.2 + x2.3 + x2.4 + x3.1 + x3.2 + x3.3 + x3.4 + x4.1 + x4.2 + x4.3 + x4.4
+Subject to
+x1.1 + x1.2 + x1.3 + x1.4 <= 1
+x1.1 + x2.1 + x3.1 + x4.1 <= 1
+x2.1 + x2.2 + x2.3 + x2.4 <= 1
+x1.2 + x2.2 + x3.2 + x4.2 <= 1
+x3.1 + x3.2 + x3.3 + x3.4 <= 1
+x1.3 + x2.3 + x3.3 + x4.3 <= 1
+x4.1 + x4.2 + x4.3 + x4.4 <= 1
+x1.4 + x2.4 + x3.4 + x4.4 <= 1
+x1.1 <= 1
+x1.2 + x2.1 <= 1
+x1.3 + x2.2 + x3.1 <= 1
+x1.4 + x2.3 + x3.2 + x4.1 <= 1
+x2.4 + x3.3 + x4.2 <= 1
+x3.4 + x4.3 <= 1
+x4.4 <= 1
+x1.4 <= 1
+x1.3 + x2.4 <= 1
+x1.2 + x2.3 + x3.4 <= 1
+x1.1 + x2.2 + x3.3 + x4.4 <= 1
+x2.1 + x3.2 + x4.3 <= 1
+x3.1 + x4.2 <= 1
+x4.1 <= 1
+x1.1 <= 1
+x1.2 <= 1
+x1.3 <= 1 
+x1.4 <= 1 
+x2.1 <= 1 
+x2.2 <= 1
+x2.3 <= 1
+x2.4 <= 1 
+x3.1 <= 1
+x3.2 <= 1
+x3.3 <= 1
+x3.4 <= 1
+x4.1 <= 1
+x4.2 <= 1
+x4.3 <= 1
+x4.4 <= 1
+-x1.1 <= 0
+-x1.2 <= 0
+-x1.3 <= 0
+-x1.4 <= 0
+-x2.1 <= 0
+-x2.2 <= 0
+-x2.3 <= 0
+-x2.4 <= 0
+-x3.1 <= 0
+-x3.2 <= 0
+-x3.3 <= 0
+-x3.4 <= 0
+-x4.1 <= 0
+-x4.2 <= 0
+-x4.3 <= 0
+-x4.4 <= 0
+Generals
+x1.1
+x1.2
+x1.3
+x1.4
+x2.1
+x2.2
+x2.3
+x2.4
+x3.1
+x3.2
+x3.3
+x3.4
+x4.1
+x4.2
+x4.3
+x4.4
+End
+"""
+
+LP6=\
+"""
+Maximize 
+ x1.1 + x1.2 + x1.3 + x2.1 + x2.2 + x2.3 + x3.1 + x3.2 + x3.3
+Subject to
+x1.1 + x1.2 + x1.3 <= 1
+x1.1 + x2.1 + x3.1 <= 1
+x2.1 + x2.2 + x2.3 <= 1
+x1.2 + x2.2 + x3.2 <= 1
+x3.1 + x3.2 + x3.3 <= 1
+x1.3 + x2.3 + x3.3 <= 1
+x1.1 <= 1
+x1.2 + x2.1 <= 1
+x1.3 + x2.2 + x3.1 <= 1
+x2.3 + x3.2 <= 1
+x3.3 <= 1
+x1.3 <= 1
+x1.2 + x2.3 <= 1
+x1.1 + x2.2 + x3.3 <= 1
+x2.1 + x3.2 <= 1
+x3.1 <= 1
+x1.1 <= 1
+x1.2 <= 1
+x1.3 <= 1 
+x2.1 <= 1 
+x2.2 <= 1
+x2.3 <= 1
+x3.1 <= 1
+x3.2 <= 1
+x3.3 <= 1
+-x1.1 <= 0
+-x1.2 <= 0
+-x1.3 <= 0
+-x2.1 <= 0
+-x2.2 <= 0
+-x2.3 <= 0
+-x3.1 <= 0
+-x3.2 <= 0
+-x3.3 <= 0
+Generals
+x1.1
+x1.2
+x1.3
+x2.1
+x2.2
+x2.3
+x3.1
+x3.2
+x3.3
+End
+
+"""
+
+LP7=\
+"""
+Minimize
+Total_Cost_of_Ingredients_per_can: 0.008 BeefPercent + 0.013 ChickenPercent
+Subject To
+FatRequirement: 0.1 BeefPercent + 0.08 ChickenPercent >= 6
+FibreRequirement: 0.005 BeefPercent + 0.001 ChickenPercent <= 2
+PercentagesSum: BeefPercent + ChickenPercent = 100
+ProteinRequirement: 0.2 BeefPercent + 0.1 ChickenPercent >= 8
+SaltRequirement: 0.005 BeefPercent + 0.002 ChickenPercent <= 0.4
+ChickenPercent >= 0
+Generals
+ChickenPercent
+End
+"""
+
+LP8=\
+"""
+Minimize
+Total_Cost_of_Ingredients_per_can: 0.008 Ingr_BEEF + 0.013 Ingr_CHICKEN
+ + 0.001 Ingr_GEL + 0.01 Ingr_MUTTON + 0.002 Ingr_RICE + 0.005 Ingr_WHEAT
+Subject To
+FatRequirement: 0.1 Ingr_BEEF + 0.08 Ingr_CHICKEN + 0.11 Ingr_MUTTON
+ + 0.01 Ingr_RICE + 0.01 Ingr_WHEAT >= 6
+FibreRequirement: 0.005 Ingr_BEEF + 0.001 Ingr_CHICKEN + 0.003 Ingr_MUTTON
+ + 0.1 Ingr_RICE + 0.15 Ingr_WHEAT <= 2
+PercentagesSum: Ingr_BEEF + Ingr_CHICKEN + Ingr_GEL + Ingr_MUTTON + Ingr_RICE
+ + Ingr_WHEAT = 100
+ProteinRequirement: 0.2 Ingr_BEEF + 0.1 Ingr_CHICKEN + 0.15 Ingr_MUTTON
+ + 0.04 Ingr_WHEAT >= 8
+SaltRequirement: 0.005 Ingr_BEEF + 0.002 Ingr_CHICKEN + 0.007 Ingr_MUTTON
+ + 0.002 Ingr_RICE + 0.008 Ingr_WHEAT <= 0.4
+End
+"""
+
+LP9=\
+"""
+Minimize
+x_0 + x_1 + x_2 + x_3 + x_4 
+Subject To
+x_0 >= 1.0
+x_0 + x_1 + x_4 >= 1.0
+x_1 + x_2 + x_3 + x_4 >= 2.0
+x_0 + x_1 + x_2 + x_3 + x_4 >= 2.0
+x_2 >= 0.0 
+x_3 >= 0.0
+x_3 + x_4 >= 1.0
+x_4 >= 0.0 
+x_0 >= 0
+x_1 >= 0
+x_4 >= 0
+-x_0 >= -1
+-x_1 >= -1
+-x_2 >= -1
+-x_3 >= -1
+-x_4 >= -1
+Binaries
+x_0
+x_1
+x_2
+x_3
+x_4
+End
+"""
+
+LP10=\
+"""
+Maximize 
+ x1.1 + x1.2 + x1.3 + x1.4 + x1.5 + x2.1 + x2.2 + x2.3 + x2.4 + x2.5 + x3.1 + x3.2 + x3.3 + x3.4 + x3.5 + x4.1 + x4.2 + x4.3 + x4.4 + x4.5 + x5.1 + x5.2 + x5.3 + x5.4 + x5.5
+Subject to
+x1.1 + x1.2 + x1.3 + x1.4 + x1.5 <= 1
+x1.1 + x2.1 + x3.1 + x4.1 + x5.1 <= 1
+x2.1 + x2.2 + x2.3 + x2.4 + x2.5 <= 1
+x1.2 + x2.2 + x3.2 + x4.2 + x5.2 <= 1
+x3.1 + x3.2 + x3.3 + x3.4 + x3.5 <= 1
+x1.3 + x2.3 + x3.3 + x4.3 + x5.3 <= 1
+x4.1 + x4.2 + x4.3 + x4.4 + x4.5 <= 1
+x1.4 + x2.4 + x3.4 + x4.4 + x5.4 <= 1
+x5.1 + x5.2 + x5.3 + x5.4 + x5.5 <= 1
+x1.5 + x2.5 + x3.5 + x4.5 + x5.5 <= 1
+x1.1 <= 1
+x1.2 + x2.1 <= 1
+x1.3 + x2.2 + x3.1 <= 1
+x1.4 + x2.3 + x3.2 + x4.1 <= 1
+x1.5 + x2.4 + x3.3 + x4.2 + x5.1 <= 1
+x2.5 + x3.4 + x4.3 + x5.2 <= 1
+x3.5 + x4.4 + x5.3 <= 1
+x4.5 + x5.4 <= 1
+x5.5 <= 1
+x1.5 <= 1
+x1.4 + x2.5 <= 1
+x1.3 + x2.4 + x3.5 <= 1
+x1.2 + x2.3 + x3.4 + x4.5 <= 1
+x1.1 + x2.2 + x3.3 + x4.4 + x5.5 <= 1
+x2.1 + x3.2 + x4.3 + x5.4 <= 1
+x3.1 + x4.2 + x5.3 <= 1
+x4.1 + x5.2 <= 1
+x5.1 <= 1
+x1.1 <= 1
+x1.2 <= 1
+x1.3 <= 1 
+x1.4 <= 1 
+x1.5 <= 1
+x2.1 <= 1 
+x2.2 <= 1
+x2.3 <= 1
+x2.4 <= 1
+x2.5 <= 1 
+x3.1 <= 1
+x3.2 <= 1
+x3.3 <= 1
+x3.4 <= 1
+x3.5 <= 1
+x4.1 <= 1
+x4.2 <= 1
+x4.3 <= 1
+x4.4 <= 1
+x4.5 <= 1
+x5.1 <= 1
+x5.2 <= 1
+x5.3 <= 1
+x5.4 <= 1
+x5.5 <= 1
+-x1.1 <= 0
+-x1.2 <= 0
+-x1.3 <= 0
+-x1.4 <= 0
+-x1.5 <= 0
+-x2.1 <= 0
+-x2.2 <= 0
+-x2.3 <= 0
+-x2.4 <= 0
+-x2.5 <= 0
+-x3.1 <= 0
+-x3.2 <= 0
+-x3.3 <= 0
+-x3.4 <= 0
+-x3.5 <= 0
+-x4.1 <= 0
+-x4.2 <= 0
+-x4.3 <= 0
+-x4.4 <= 0
+-x4.5 <= 0
+-x5.1 <= 0
+-x5.2 <= 0
+-x5.3 <= 0
+-x5.4 <= 0
+-x5.5 <= 0
+Generals
+x1.1
+x1.2
+x1.3
+x1.4
+x1.5
+x2.1
+x2.2
+x2.3
+x2.4
+x2.5
+x3.1
+x3.2
+x3.3
+x3.4
+x3.5
+x4.1
+x4.2
+x4.3
+x4.4
+x4.5
+x5.1
+x5.2
+x5.3
+x5.4
+x5.5
+End
+
+"""
+
+LP11=\
+"""
+Maximize
+obj: + 786433 x1 + 655361 x2 + 589825 x3 + 557057 x4
++ 540673 x5 + 532481 x6 + 528385 x7 + 526337 x8 + 525313 x9
++ 524801 x10 + 524545 x11 + 524417 x12 + 524353 x13
++ 524321 x14 + 524305 x15
+Subject To
+cap: + 786433 x1 + 655361 x2 + 589825 x3 + 557057 x4
++ 540673 x5 + 532481 x6 + 528385 x7 + 526337 x8 + 525313 x9
++ 524801 x10 + 524545 x11 + 524417 x12 + 524353 x13
++ 524321 x14 + 524305 x15 <= 4194303.5
+x1 <= 1
+x2 <= 1
+x3 <= 1
+x4 <= 1
+x5 <= 1
+x6 <= 1
+x7 <= 1
+x8 <= 1
+x9 <= 1
+x10 <= 1
+x11 <= 1
+x12 <= 1
+x13 <= 1
+x14 <= 1
+x15 <= 1
+-x1 <= 0
+-x2 <= 0
+-x3 <= 0
+-x4 <= 0
+-x5 <= 0
+-x6 <= 0
+-x7 <= 0
+-x8 <= 0
+-x9 <= 0
+-x10 <= 0
+-x11 <= 0
+-x12 <= 0
+-x13 <= 0
+-x14 <= 0
+-x15 <= 0
+Generals
+x1
+x2
+x3
+x4
+x5
+x6
+x7
+x8
+x9
+x10
+x11
+x12
+x13
+x14
+x15
+End
+"""
+
+LP12=\
+"""
+Maximize
+obj: x1 + x2 + 3x3 + 3x4
+
+Subject To
+x1 + x2 + x3 + x4 =< 120
+x1 + x3 <= 300
+x1 + x2 <= 500
+x1 - 2x2 <=	0
+-2x3 - 3x2 <= 0
+
+x1 >= 0
+x2 >= 0
+x3 >= 0
+x4 >= 0
+
+
+Generals
+x1
+x2
+x3
+x4
+	
+End
+"""
+
+LP13=\
+"""
+Maximize
+obj: x1+x2
+Subject to
+-x1+x2 <= 1
+x1 <= 3
+x2 <= 2
+
+Generals
+x1
+x2
+
+End
+"""
+
+#
+# Rozne implementacje pivot rules
+#
+
+#0 Wybor losowy (jednostajny rozklad)
+
+def uniform_random_entering(self):
+    return np.random.choice(self.possible_entering())
+
+def uniform_random_leaving(self):
+    return np.random.choice(self.possible_leaving())
+
+
+#1.0 Wybor zmiennej o najwiekszym wspolczynniku funkcji celu
+
+def coeff(self):
+    values = {}
+    for i in self.possible_entering():
+        licznik = list(self.nonbasic_variables()).index(i)
+        values[i] = self.objective_coefficients()[licznik]
+    return values
+
+def largest_coefficient_entering(self):
+    values = coeff(self)
+    return max(values.iteritems(), key=operator.itemgetter(1))[0]
+
+def largest_coefficient_leaving(self):
+    return self.possible_leaving()[0]
+
+#2.0 Wybor zmiennej o najmniejszym wspolczynniku funkcji celu
+
+def smallest_coefficient_entering(self):
+    values = coeff(self)
+    return min(values.iteritems(), key=operator.itemgetter(1))[0]
+
+def smallest_coefficient_leaving(self):
+    return self.possible_leaving()[0]
+
+#3.0 Wybor zmiennej wchodzacej i wychodzacej o najmniejszym indeksie (porzadek leksykograficzny, minimum)
+
+def lexicographical_min_entering(self):
+	return min(self.possible_entering())
+
+def lexicographical_min_leaving(self):
+	return min(self.possible_leaving())
+
+#4.0 Wybor zmiennej wchodzacej i wychodzacej o najwiekszym indeksie (porzadek leksykograficzny, maksimum)
+
+def lexicographical_max_entering(self):
+	return max(self.possible_entering())
+
+def lexicographical_max_leaving(self):
+	return max(self.possible_leaving())
+
+#5.0 Wybor zmiennej, ktory prowadzi do wierzcholka w kierunku najblizszym wektorowi c (gradientowi funkcji celu)
+
+def steep(self):
+    values = {}
+    for i in self.possible_entering():
+        next1 = dc(self)
+        next1.enter(i)
+        for j in next1.possible_leaving():
+            next2 = dc(next1)
+            next2.leave(j)
+            next2.update()
+            values[(i,j)] = np.dot(self.objective_coefficients(), (next2.basic_solution()-self.basic_solution())/np.linalg.norm(next2.basic_solution()-self.basic_solution()))
+    return values
+
+def steepest_edge_entering(self):
+    values = steep(self)
+    return max(values.iteritems(), key=operator.itemgetter(1))[0][0]
+
+def steepest_edge_leaving(self):
+    values = steep(self)
+    return max(values.iteritems(), key=operator.itemgetter(1))[0][1]
+
+#6.0 Wybor zmiennej, ktory prowadzi do wierzcholka w kierunku najdalszym wektorowi c (gradientowi funkcji celu)
+
+def flattest_edge_entering(self):
+    values = steep(self)
+    return min(values.iteritems(), key=operator.itemgetter(1))[0][0]
+
+def flattest_edge_leaving(self):
+    values = steep(self)
+    return min(values.iteritems(), key=operator.itemgetter(1))[0][1]
+
+
+#7.0 Wybor zmiennej, ktory prowadzi do najwiekszego wzrostu funkcji celu
+
+def obj_function(self):
+    values = {}
+    for i in self.possible_entering():
+        next = dc(self)
+        next.enter(i)
+        for j in next.possible_leaving():
+            next2 = deepcopy(next)
+            next2.leave(j)
+            next2.update()
+            values[(i,j)] = next2.objective_value()
+    return values
+
+def largest_increase_entering(self):
+    values = obj_function(self)
+    return max(values.iteritems(), key=operator.itemgetter(1))[0][0]
+    
+def largest_increase_leaving(self):
+    values = obj_function(self)
+    return max(values.iteritems(), key=operator.itemgetter(1))[0][1]
+
+#8.0 Wybor zmiennej, ktory prowadzi do najmniejszego wzrostu funkcji celu
+
+def smallest_increase_entering(self):
+    #print "o, tak"
+    values = obj_function(self)
+    return min(values.iteritems(), key=operator.itemgetter(1))[0][0]
+    
+def smallest_increase_leaving(self):
+    #print "o,nie"
+    values = obj_function(self)
+    return min(values.iteritems(), key=operator.itemgetter(1))[0][1]
+
+#9.0 Wybor losowy - krawedz (prawdopodobienstwo jednostajne)
+
+def edges(self):
+    names = []
+    for i in self.possible_entering():
+        next1 = dc(self)
+        next1.enter(i)
+        for j in next1.possible_leaving():
+            next2 = dc(next1)
+            next2.leave(j)
+            next2.update()
+            names.append((i, j))
+    return names
+
+main_edge = None
+count = 0
+
+def random_edge_entering(self):
+    global count
+    global main_edge
+    if count%2 == 0:
+        values = edges(self)
+        main_edge = random.choice(values)
+    count += 1
+    return main_edge[0]
+
+def random_edge_leaving(self):
+    global count
+    global main_edge
+    if count%2 == 0:
+        values = edges(self)
+        main_edge = random.choice(values)
+    count += 1
+    return main_edge[1]
+
+
+#10.0 Kopniety Poisson xD
+
+def poisson_modulo_entering(self):
+    rand = np.random.choice(range(100))
+    poiss = np.random.poisson(rand,1)
+    return self.possible_entering()[poiss%(len(self.possible_entering()))]
+
+def poisson_modulo_leaving(self):
+    rand = np.random.choice(range(100))
+    poiss = np.random.poisson(rand,1)
+    return self.possible_leaving()[poiss%(len(self.possible_leaving()))]
+
+
+
+def my_entering(self):
+    return eval(methods[number_m][0])
+
+def my_leaving(self):
+    return eval(methods[number_m][1])
+
+#with open('problem.lp', 'r') as lpfile:
+#    LP=lpfile.read()
+
+##############################################################################
+##############################################################################
+##############################################################################
+##############################################################################
+##############################################################################
+##############################################################################
+##############################################################################
+##############################################################################
+
+from sage.misc.html import HtmlFragment
+import types
+
+def my_run_simplex_method(self):
+    output = []
+    while not self.is_optimal():
+        self.pivots += 1
+        if self.entering() is None:
+            self.enter(self.pivot_select_entering())
+        if self.leaving() is None:
+            if self.possible_leaving():
+                self.leave(self.pivot_select_leaving())
+
+        output.append(self._html_())
+        if self.leaving() is None:
+            output.append("The problem is unbounded in $()$ direction.".format(latex(self.entering())))
+            break
+        output.append(self._preupdate_output("primal"))
+        self.update()
+    if self.is_optimal():
+        output.append(self._html_())
+    return HtmlFragment("\n".join(output))
+
+#
+# Parsowanie danych
+#
+
+class Matrix:
+    """ output matrix class """
+    
+    class Objective:
+        def __init__(self, expression, sense, name):
+            if name:
+                self.name = name[int(0)]
+            else:
+                self.name = ""
+            self.sense = sense # 1 is minimise, -1 is maximise
+            self.expression = expression # a dict with variable names as keys, and coefficients as values
+
+    class Constraint:
+        def __init__(self, expression, sense, rhs, name):
+            if name:
+                self.name = name[int(0)]
+            else:
+                self.name = ""
+            self.sense = sense # 1 is geq, 0 is eq, -1 is leq
+            self.rhs = rhs
+            self.expression = expression
+    
+    class Variable:
+        def __init__(self, bounds, category, name):
+            self.name = name
+            self.bounds = (bounds["lb"], bounds["ub"]) # a tuple (lb, ub)
+            self.category = category # 1 for int, 0 for linear
+
+    def __init__(self, parserObjective, parserConstraints, parserBounds, parserGenerals, parserBinaries):
+
+        self.objective = Matrix.Objective(varExprToDict(parserObjective.varExpr), objSenses[parserObjective.objSense], parserObjective.name)
+        
+        self.constraints = [Matrix.Constraint(varExprToDict(c.varExpr), constraintSenses[c.sense], c.rhs, c.name) for c in parserConstraints]
+        
+        boundDict = getBoundDict(parserBounds, parserBinaries) # can't get parser to generate this dict because one var can have several bound statements
+        
+        allVarNames = set()
+        allVarNames.update(self.objective.expression.keys())
+        for c in self.constraints:
+            allVarNames.update(c.expression.keys())
+        allVarNames.update(parserGenerals)
+        allVarNames.update(boundDict.keys())
+        
+        self.variables = [Matrix.Variable(boundDict[vName], ((vName in list(parserGenerals)) or (vName in list(parserBinaries))), vName) for vName in allVarNames]
+
+    def __repr__(self):
+        return "Objective%s\n\nConstraints (%d)%s\n\nVariables (%d)%s" \
+        %("\n%s %s %s"%(self.objective.sense, self.objective.name, str(self.objective.expression)), \
+          len(self.constraints), \
+          "".join(["\n(%s, %s, %s, %s)"%(c.name, str(c.expression), c.sense, c.rhs) for c in self.constraints]), \
+          len(self.variables), \
+          "".join(["\n(%s, %s, %s)"%(v.name, str(v.bounds), v.category) for v in self.variables]))
+
+    def getInteractiveLPProblem(self):
+        A = [[0 for x in range(len(self.variables))] for y in range(len(self.constraints))]
+        b = [0] * len(self.constraints)
+        c = [0] * len(self.variables)
+
+        for i, constraint in enumerate(self.constraints):
+            for v, a in constraint.expression.iteritems():
+                if constraint.sense == 1:
+                    A[i][map(lambda x: x.name, self.variables).index(v)] = -a
+                else:
+                    A[i][map(lambda x: x.name, self.variables).index(v)] = a
+
+                if constraint.sense == 1:		
+                    b[i] = -constraint.rhs
+                else:
+                    b[i] = constraint.rhs 
+
+        for v, a in self.objective.expression.iteritems():
+            if self.objective.sense == 1:
+                c[map(lambda x: x.name, self.variables).index(v)] = -a
+            else:
+                c[map(lambda x: x.name, self.variables).index(v)] = a
+
+        AA = ()
+        bb = ()
+        cc = ()
+
+        for a in A:
+            aaa=[]
+            for aa in a:
+                aaa.append(aa*int(10000))        
+            AA = AA + (list(aaa),)
+        for b in b:
+            bb = bb + (b*int(10000),)
+        for c in c:
+            cc = cc + (c*int(10000),)
+
+        lpp = InteractiveLPProblemStandardForm(AA,bb,cc)
+
+        for i, v in enumerate(self.variables):
+            if v.bounds[int(1)] < infinity:
+                coef = [0,] * len(self.variables)
+                coef[i] = 1
+                lpp = lpp.add_constraint((coef), v.bounds[int(1)]*int(10000))
+            if v.bounds[int(0)] > -infinity:
+                coef = [0,] * len(self.variables)
+                coef[i] = -1
+                lpp = lpp.add_constraint((coef), -v.bounds[int(0)]*int(10000))
+
+        return lpp
+
+def varExprToDict(varExpr):
+    return dict((v.name[int(0)], v.coef) for v in varExpr)
+
+def getBoundDict(parserBounds, parserBinaries):
+    boundDict = defaultdict(lambda: {"lb": -infinity, "ub": infinity}) # need this versatility because the lb and ub can come in separate bound statements
+
+    for b in parserBounds:
+        bName = b.name[int(0)]
+        
+        # if b.free, default is fine
+
+        if b.leftbound:
+            if constraintSenses[b.leftbound.sense] >= 0: # NUM >= var
+                boundDict[bName]["ub"] = b.leftbound.numberOrInf
+
+            if constraintSenses[b.leftbound.sense] <= 0: # NUM <= var
+                boundDict[bName]["lb"] = b.leftbound.numberOrInf
+        
+        if b.rightbound:
+            if constraintSenses[b.rightbound.sense] >= 0: # var >= NUM
+                boundDict[bName]["lb"] = b.rightbound.numberOrInf
+
+            if constraintSenses[b.rightbound.sense] <= 0: # var <= NUM
+                boundDict[bName]["ub"] = b.rightbound.numberOrInf
+    
+    for bName in parserBinaries:
+        boundDict[bName]["lb"] = 0
+        boundDict[bName]["ub"] = 1
+
+    return boundDict
+    
+
+def multiRemove(baseString, removables):
+    """ replaces an iterable of strings in removables 
+        if removables is a string, each character is removed """
+    for r in removables:
+        try:
+            baseString = baseString.replace(r, "")
+        except TypeError:
+            raise TypeError, "Removables contains a non-string element"
+    return baseString
+
+from pyparsing import *
+from sys import argv, exit
+from collections import defaultdict
+
+MINIMIZE = 1
+MAXIMIZE = -1
+
+objSenses = {"max": MAXIMIZE, "maximum": MAXIMIZE, "maximize": MAXIMIZE, \
+             "min": MINIMIZE, "minimum": MINIMIZE, "minimize": MINIMIZE}
+
+GEQ = 1
+EQ = 0
+LEQ = -1
+
+constraintSenses = {"<": LEQ, "<=": LEQ, "=<": LEQ, \
+                    "=": EQ, \
+                    ">": GEQ, ">=": GEQ, "=>": GEQ}
+
+infinity = 1E30
+
+def read(fullDataString):
+    #name char ranges for objective, constraint or variable
+    allNameChars = alphanums + "!\"#$%&()/,.;?@_'`{}|~"
+    firstChar = multiRemove(allNameChars, nums + "eE.") #<- can probably use CharsNotIn instead
+    name = Word(firstChar, allNameChars, max=255)
+    keywords = ["inf", "infinity", "max", "maximum", "maximize", "min", "minimum", "minimize", "s.t.", "st", "bound", "bounds", "bin", "binaries", "binary", "gen",  "general", "end"]
+    pyKeyword = MatchFirst(map(CaselessKeyword, keywords))
+    validName = ~pyKeyword + name
+    validName = validName.setResultsName("name")
+
+    colon = Suppress(oneOf(": ::"))
+    plusMinus = oneOf("+ -")
+    inf = oneOf("inf infinity", caseless=True)
+    number = Word(nums+".")
+    sense = oneOf("< <= =< = > >= =>").setResultsName("sense")
+
+    # section tags
+    objTagMax = oneOf("max maximum maximize", caseless=True)
+    objTagMin = oneOf("min minimum minimize", caseless=True)
+    objTag = (objTagMax | objTagMin).setResultsName("objSense")
+
+    constraintsTag = oneOf(["subj to", "subject to", "s.t.", "st"], caseless=True)
+
+    boundsTag = oneOf("bound bounds", caseless=True)
+    binTag = oneOf("bin binaries binary", caseless=True)
+    genTag = oneOf("gen general", caseless=True)
+
+    endTag = CaselessLiteral("end")
+
+    # coefficient on a variable (includes sign)
+    firstVarCoef = Optional(plusMinus, "+") + Optional(number, "1")
+    firstVarCoef.setParseAction(lambda tokens: eval("".join(tokens))) #TODO: can't this just be eval(tokens[0] + tokens[1])?
+
+    coef = plusMinus + Optional(number, "1")
+    coef.setParseAction(lambda tokens: eval("".join(tokens))) #TODO: can't this just be eval(tokens[0] + tokens[1])?
+
+    # variable (coefficient and name)
+    firstVar = Group(firstVarCoef.setResultsName("coef") + validName)
+    var = Group(coef.setResultsName("coef") + validName)
+
+    # expression
+    varExpr = firstVar + ZeroOrMore(var)
+    varExpr = varExpr.setResultsName("varExpr")
+
+    # objective
+    objective = objTag + Optional(validName + colon) + varExpr
+    objective = objective.setResultsName("objective")
+
+    # constraint rhs
+    rhs = Optional(plusMinus, "+") + number
+    rhs = rhs.setResultsName("rhs")
+    rhs.setParseAction(lambda tokens: eval("".join(tokens)))
+
+    # constraints
+    constraint = Group(Optional(validName + colon) + varExpr + sense + rhs)
+    constraints = ZeroOrMore(constraint)
+    constraints = constraints.setResultsName("constraints")
+
+    # bounds
+    signedInf = (plusMinus + inf).setParseAction(lambda tokens:(tokens[int(0)] == "+") * infinity)
+    signedNumber = (Optional(plusMinus, "+") + number).setParseAction(lambda tokens: eval("".join(tokens)))  # this is different to previous, because "number" is mandatory not optional
+    numberOrInf = (signedNumber | signedInf).setResultsName("numberOrInf")
+    ineq = numberOrInf & sense
+    sensestmt = Group(Optional(ineq).setResultsName("leftbound") + validName + Optional(ineq).setResultsName("rightbound"))
+    freeVar = Group(validName + Literal("free"))
+
+    boundstmt = freeVar | sensestmt 
+    bounds = boundsTag + ZeroOrMore(boundstmt).setResultsName("bounds")
+
+    # generals
+    generals = genTag + ZeroOrMore(validName).setResultsName("generals") 
+
+    # binaries
+    binaries = binTag + ZeroOrMore(validName).setResultsName("binaries")
+
+    varInfo = ZeroOrMore(bounds | generals | binaries)
+
+    grammar = objective + constraintsTag + constraints + varInfo + endTag
+
+    # commenting
+    commentStyle = Literal("\\") + restOfLine
+    grammar.ignore(commentStyle)
+
+    # parse input string
+    parseOutput = grammar.parseString(fullDataString)
+
+    # create generic output Matrix object
+    m = Matrix(parseOutput.objective, parseOutput.constraints, parseOutput.bounds, parseOutput.generals, parseOutput.binaries)
+
+    return m
+
+#
+# Parsowanie danych
+#
+
+
+
+methods = [("uniform_random_entering(self)","uniform_random_leaving(self)"),
+           ("largest_coefficient_entering(self)","largest_coefficient_leaving(self)"),
+           ("smallest_coefficient_entering(self)","smallest_coefficient_leaving(self)"),
+           ("lexicographical_max_entering(self)","lexicographical_max_leaving(self)"),
+           ("lexicographical_min_entering(self)","lexicographical_min_leaving(self)"),
+           ("steepest_edge_entering(self)","steepest_edge_leaving(self)"),
+           ("flattest_edge_entering(self)","flattest_edge_leaving(self)"),
+           ("largest_increase_entering(self)","largest_increase_leaving(self)"),
+           ("smallest_increase_entering(self)","smallest_increase_leaving(self)"),
+           ("poisson_modulo_entering(self)","poisson_modulo_leaving(self)"),
+           ("random_edge_entering(self)","random_edge_leaving(self)")]
+
+LPProblems = ["LP0","LP1","LP2","LP3","LP4","LP5","LP6","LP7","LP8","LP9", "LP10","LP11","LP12","LP13"]
+
+#Wybór zakresu problemow
+for liczniczeczek in range(1,4):
+    
+    #Wybór zakresu metod 
+    for liczniczek in range(0,11):
+        number_m = liczniczek
+        number_p = liczniczeczek
+
+        m = read(eval(LPProblems[number_p]))
+        P = m.getInteractiveLPProblem()
+
+#
+# Ustawienie wlasnej funkcji pivot
+#
+
+        D = P.initial_dictionary()
+
+        if not D.is_feasible():
+            #print "The initial dictionary is infeasible, solving auxiliary problem."
+            # Phase I
+            AD = P.auxiliary_problem().initial_dictionary()
+            AD.enter(P.auxiliary_variable())
+            AD.leave(min(zip(AD.constant_terms(), AD.basic_variables()))[int(1)])
+            AD.run_simplex_method()
+            if AD.objective_value() < 0:
+                #print "The original problem is infeasible."
+                P._final_dictionary = AD
+            else:
+                #print "Back to the original problem."
+                D = P.feasible_dictionary(AD)
+
+
+        D.run_simplex_method = types.MethodType(my_run_simplex_method, D)
+        D.pivots = 0
+
+        D.pivot_select_entering = types.MethodType(my_entering, D)
+        D.pivot_select_leaving = types.MethodType(my_leaving, D)
+
+#
+# Algorytm sympleks
+#
+
+        if D.is_feasible():
+            D.run_simplex_method()
+        print "Problem nr: ", liczniczeczek
+        print "Metoda nr: ",liczniczek
+        print "Number of pivot steps: ", D.pivots
+
+#print "Objective value: ", D.objective_value()
+#print "Nonbasic variables: ", D.nonbasic_variables()
+#print "Basic variables: ", D.basic_variables()
+#print "Objective coefficients: ", P.objective_coefficients()
+#print "Optimal solution: ", P.optimal_solution()
